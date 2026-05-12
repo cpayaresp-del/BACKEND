@@ -11,6 +11,7 @@ const imagekitRoutes = require('./routes/imagekitRoutes');
 const usersRoutes = require('./routes/usersRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/imagekit', imagekitRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 app.use((err, req, res, next) => {
   const status = err.status || 500;
