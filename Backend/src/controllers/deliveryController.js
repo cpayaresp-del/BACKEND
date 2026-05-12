@@ -1,20 +1,6 @@
 const DeliveryAssignment = require('../models/delivery');
 const Order = require('../models/order');
 const admin = require('../config/firebase');
-let cloudinary;
-try {
-  cloudinary = require('cloudinary').v2;
-  // Configurar Cloudinary
-  if (process.env.CLOUDINARY_NAME && process.env.CLOUDINARY_KEY && process.env.CLOUDINARY_SECRET) {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_NAME,
-      api_key: process.env.CLOUDINARY_KEY,
-      api_secret: process.env.CLOUDINARY_SECRET,
-    });
-  }
-} catch (e) {
-  console.log('Cloudinary not available');
-}
 const getMyDeliveries = async (req, res) => {
   try {
     const deliveries = await DeliveryAssignment.find({
@@ -104,7 +90,7 @@ const updateDeliveryStatus = async (req, res) => {
 const addDeliveryEvidence = async (req, res) => {
   try {
     const { deliveryId } = req.params;
-    const { evidence } = req.body; // Array of base64 images
+    const { evidenceUrls } = req.body; // Array of ImageKit URLs
 
     const delivery = await DeliveryAssignment.findById(deliveryId);
     if (!delivery) {
@@ -116,34 +102,17 @@ const addDeliveryEvidence = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    if (!Array.isArray(evidence) || evidence.length === 0) {
-      return res.status(400).json({ message: 'Evidence must be a non-empty array' });
+    if (!Array.isArray(evidenceUrls) || evidenceUrls.length === 0) {
+      return res.status(400).json({ message: 'Evidence URLs must be a non-empty array' });
     }
 
-    // Upload images to Cloudinary if configured
-    for (const base64Img of evidence) {
-      try {
-        if (cloudinary && cloudinary.config().api_key) {
-          // Upload to Cloudinary
-          const uploadResponse = await cloudinary.uploader.upload(base64Img, {
-            folder: 'daylishop/delivery-evidence',
-            resource_type: 'auto',
-          });
-          delivery.evidenceImages.push({
-            url: uploadResponse.secure_url,
-            uploadedAt: new Date(),
-          });
-        } else {
-          // Fallback: store base64 (not recommended for production)
-          console.warn('⚠️ Cloudinary not configured, storing evidence as base64');
-          delivery.evidenceImages.push({
-            url: base64Img,
-            uploadedAt: new Date(),
-          });
-        }
-      } catch (uploadError) {
-        console.error('Error uploading evidence image:', uploadError);
-        // Continue with next image but log error
+    // Add all evidence URLs to delivery
+    for (const url of evidenceUrls) {
+      if (url && url.trim()) {
+        delivery.evidenceImages.push({
+          url: url.trim(),
+          uploadedAt: new Date(),
+        });
       }
     }
 
