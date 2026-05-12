@@ -1,5 +1,6 @@
 const DeliveryAssignment = require('../models/delivery');
 const Order = require('../models/order');
+const Product = require('../models/product');
 const admin = require('../config/firebase');
 const getMyDeliveries = async (req, res) => {
   try {
@@ -9,7 +10,20 @@ const getMyDeliveries = async (req, res) => {
       .populate('orderId')
       .sort({ assignedAt: -1 });
 
-    const formattedDeliveries = deliveries.map(delivery => ({
+    const missingProductIds = deliveries
+      .flatMap((delivery) => delivery.items)
+      .filter((item) => !item.productImage && item.productId)
+      .map((item) => item.productId);
+
+    const productMap = new Map();
+    if (missingProductIds.length > 0) {
+      const products = await Product.find({ _id: { $in: missingProductIds } });
+      products.forEach((product) => {
+        productMap.set(product._id.toString(), product);
+      });
+    }
+
+    const formattedDeliveries = deliveries.map((delivery) => ({
       _id: delivery._id,
       id: delivery._id,
       orderId: delivery.orderId?._id || delivery.orderId,
@@ -18,7 +32,12 @@ const getMyDeliveries = async (req, res) => {
       customerName: delivery.customerName,
       customerPhone: delivery.customerPhone,
       customerAddress: delivery.customerAddress,
-      items: delivery.items,
+      items: delivery.items.map((item) => ({
+        ...item.toObject(),
+        productImage:
+          item.productImage ||
+          (productMap.get(item.productId?.toString())?.images?.[0] || ''),
+      })),
       total: delivery.total,
       status: delivery.status,
       assignedAt: delivery.assignedAt,
