@@ -59,6 +59,10 @@ const getOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
       .populate('user', 'name phone')
+      .populate({
+        path: 'items.product',
+        select: 'name images price stock'
+      })
       .sort({ createdAt: -1 });
 
     const orderIds = orders.map((order) => order._id);
@@ -77,8 +81,10 @@ const getOrders = async (req, res) => {
         userPhone: order.user?.phone || '',
         items: order.items.map((item) => ({
           productId: item.product?._id?.toString() ?? '',
-          productName: item.name || '',
-          productImage: '',
+          productName: item.product?.name || item.name || '',
+          productImage: (item.product?.images && item.product?.images.length > 0) 
+            ? item.product?.images[0] 
+            : '',
           quantity: item.quantity,
           price: item.price,
         })),
@@ -93,7 +99,7 @@ const getOrders = async (req, res) => {
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
         repartidorName: delivery?.repartidorName || '',
-        evidenceImages: delivery?.evidenceImages.map((img) => img.url) || [],
+        evidenceImages: delivery?.evidenceImages?.map((img) => img.url) || [],
       };
     });
 
@@ -171,7 +177,10 @@ const getBodegaOrders = async (req, res) => {
       ],
     })
       .populate('user', 'name email phone address neighborhood city')
-      .populate('items.product')
+      .populate({
+        path: 'items.product',
+        select: 'name images price stock size'
+      })
       .sort({ createdAt: -1 });
 
     const orderIds = orders.map((order) => order._id);
@@ -198,7 +207,9 @@ const getBodegaOrders = async (req, res) => {
         items: order.items.map((item) => ({
           productId: item.product?._id || '',
           productName: item.product?.name || item.name || '',
-          productImage: item.product?.image || item.product?.images?.[0] || '',
+          productImage: (item.product?.images && item.product?.images.length > 0) 
+            ? item.product?.images[0] 
+            : '',
           quantity: item.quantity,
           price: item.price,
           size: item.product?.size || '',
@@ -231,8 +242,13 @@ const assignRepartidor = async (req, res) => {
     const { orderId } = req.params;
     const { repartidorId } = req.body;
 
-    // Get order with user info
-    const order = await Order.findById(orderId).populate('user', 'name phone address neighborhood city');
+    // Get order with user info and fully populated items
+    const order = await Order.findById(orderId)
+      .populate('user', 'name phone address neighborhood city')
+      .populate({
+        path: 'items.product',
+        select: 'name images price stock'
+      });
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
@@ -247,10 +263,13 @@ const assignRepartidor = async (req, res) => {
     order.status = 'shipped';
     await order.save();
 
-    // Format items for delivery
+    // Format items for delivery - ensure images are included
     const items = order.items.map(item => ({
-      productId: item.product?.toString() || '',
-      productName: item.name || '',
+      productId: item.product?._id?.toString() || item.product?.toString() || '',
+      productName: item.product?.name || item.name || '',
+      productImage: (item.product?.images && item.product?.images.length > 0) 
+        ? item.product?.images[0] 
+        : '',
       quantity: item.quantity,
       price: item.price,
       size: '',
