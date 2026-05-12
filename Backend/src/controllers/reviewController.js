@@ -10,6 +10,14 @@ const createReview = async (req, res) => {
     const { productId, comment, rating } = req.body;
     const userId = req.user._id;
 
+    if ((!comment || comment.trim().length === 0) && (rating == null)) {
+      return res.status(400).json({ message: 'Debes enviar un comentario o una calificación.' });
+    }
+
+    if (rating != null && (rating < 1 || rating > 5)) {
+      return res.status(400).json({ message: 'La calificación debe estar entre 1 y 5.' });
+    }
+
     // Verificar si el usuario ha comprado el producto
     const hasPurchased = await Order.findOne({
       user: userId,
