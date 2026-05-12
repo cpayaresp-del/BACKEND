@@ -26,8 +26,22 @@ const getProducts = async (req, res) => {
 
     if (category) {
       // Asumir que category puede ser una lista separada por comas si es jerárquico
-      const categories = category.split(',');
-      query.category = { $in: categories };
+      const categories = category
+        .split(',')
+        .map((cat) => cat.trim())
+        .filter((cat) => cat.length > 0);
+
+      if (categories.length > 0) {
+        query.$or = [
+          { category: { $in: categories } },
+          { subcategory: { $in: categories } },
+        ];
+      } else {
+        query.$or = [
+          { category: { $in: [''] } },
+          { subcategory: { $in: [''] } },
+        ];
+      }
     }
     if (search) query.name = { $regex: search, $options: 'i' };
 
@@ -69,7 +83,7 @@ const createProduct = async (req, res) => {
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + parseInt(discountDurationDays));
       productData.discountEndDate = endDate;
-      console.log(`📅 Descuento vigente hasta: ${endDate}`);
+      console.log(`Descuento vigente hasta: ${endDate}`);
     }
 
     const product = await Product.create({
@@ -103,7 +117,7 @@ const updateProduct = async (req, res) => {
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + parseInt(discountDurationDays));
       updateData.discountEndDate = endDate;
-      console.log(`📅 Descuento actualizado, vigente hasta: ${endDate}`);
+      console.log(`Descuento actualizado, vigente hasta: ${endDate}`);
     }
 
     // Obtener producto anterior para comparar descuentos
@@ -131,12 +145,12 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // 📢 Enviar notificación si se agregó o aumentó el descuento
+    // Enviar notificación si se agregó o aumentó el descuento
     const previousDiscount = previousProduct?.discountPercent || 0;
     const currentDiscount = product.discountPercent || 0;
     
     if (currentDiscount > previousDiscount && currentDiscount > 0) {
-      console.log(`📢 Enviando notificación de descuento para ${product.name}`);
+      console.log(`Enviando notificación de descuento para ${product.name}`);
       await _sendDiscountNotification(product);
     }
 
@@ -162,12 +176,12 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-// 📢 Función auxiliar para enviar notificaciones de descuento
+// Función auxiliar para enviar notificaciones de descuento
 const _sendDiscountNotification = async (product) => {
   try {
     // Si Firebase no está disponible, simplemente retornar
     if (!admin) {
-      console.warn('⚠️ Firebase no disponible, omitiendo notificación de descuento');
+      console.warn('Firebase no disponible, omitiendo notificación de descuento');
       return;
     }
 
@@ -177,11 +191,11 @@ const _sendDiscountNotification = async (product) => {
     });
 
     if (users.length === 0) {
-      console.log('⚠️ No hay usuarios para notificar');
+      console.log('No hay usuarios para notificar');
       return;
     }
 
-    const title = '🎉 ¡Producto en Descuento!';
+    const title = '¡Producto en Descuento!';
     const body = `${product.name} tiene un descuento del ${product.discountPercent}%`;
     const data = {
       type: 'discount',
@@ -208,18 +222,18 @@ const _sendDiscountNotification = async (product) => {
         await admin.messaging().send(message);
         sentCount++;
       } catch (error) {
-        console.error(`❌ Error enviando notificación a ${user.email}:`, error);
+        console.error(`Error enviando notificación a ${user.email}:`, error);
         if (error?.code === 'messaging/registration-token-not-registered' ||
             error?.code === 'messaging/invalid-registration-token' ||
             error?.code === 'messaging/invalid-argument') {
           await User.findByIdAndUpdate(user._id, { fcmToken: null });
-          console.log(`🧹 Token inválido removido para ${user.email}`);
+          console.log(`Token inválido removido para ${user.email}`);
         }
         failedCount++;
       }
     }
 
-    console.log(`✅ Notificaciones enviadas: ${sentCount}/${users.length} (${failedCount} fallidas)`);
+    console.log(`Notificaciones enviadas: ${sentCount}/${users.length} (${failedCount} fallidas)`);
   } catch (error) {
     console.error('Error en _sendDiscountNotification:', error);
   }
