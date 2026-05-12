@@ -19,13 +19,29 @@ const getDescendantCategoryIds = async (parentId) => {
   return descendants;
 };
 
+const formatProductForResponse = (product) => {
+  const obj = product.toObject();
+  return {
+    ...obj,
+    category: obj.categoryName || (product.category?.name ?? ''),
+    categoryId:
+      obj.category?.toString?.() ||
+      (product.category?._id?.toString?.() ?? null) ||
+      null,
+    subcategory: obj.subcategoryName || (product.subcategory?.name ?? ''),
+    subcategoryId:
+      obj.subcategory?.toString?.() ||
+      (product.subcategory?._id?.toString?.() ?? null) ||
+      null,
+  };
+};
+
 const getProducts = async (req, res) => {
   try {
     const { category, search, page = 1, limit = 100 } = req.query;
     const query = { isActive: true };
 
     if (category) {
-      // Asumir que category puede ser una lista separada por comas si es jerárquico
       const categories = category
         .split(',')
         .map((cat) => cat.trim())
@@ -36,22 +52,25 @@ const getProducts = async (req, res) => {
           { category: { $in: categories } },
           { subcategory: { $in: categories } },
         ];
-      } else {
-        query.$or = [
-          { category: { $in: [''] } },
-          { subcategory: { $in: [''] } },
-        ];
       }
     }
     if (search) query.name = { $regex: search, $options: 'i' };
 
     const skip = (Number(page) - 1) * Number(limit);
     const [products, total] = await Promise.all([
-      Product.find(query).collation({ locale: 'es', strength: 1 }).skip(skip).limit(Number(limit)).sort({ createdAt: -1 }),
+      Product.find(query)
+        .collation({ locale: 'es', strength: 1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .sort({ createdAt: -1 })
+        .populate('category', 'name')
+        .populate('subcategory', 'name'),
       Product.countDocuments(query).collation({ locale: 'es', strength: 1 }),
     ]);
 
-    res.json({ products, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    const formattedProducts = products.map(formatProductForResponse);
+
+    res.json({ products: formattedProducts, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -59,11 +78,13 @@ const getProducts = async (req, res) => {
 
 const getProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id)
+      .populate('category', 'name')
+      .populate('subcategory', 'name');
     if (!product || !product.isActive) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    res.json({ product });
+    res.json({ product: formatProductForResponse(product) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -71,7 +92,27 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { images, availableSizes, discountDurationDays, ...productData } = req.body;
+    const { images, availableSizes, discountDurationDays, category, subcategory, ...productData } = req.body;
+
+    if (!category) {
+      return res.status(400).json({ message: 'La categoría es requerida' });
+    }
+
+    const categoryConfig = await CategoryConfig.findById(category);
+    if (!categoryConfig) {
+      return res.status(400).json({ message: 'Categoría no encontrada' });
+    }
+
+    let subcategoryConfig = null;
+    if (subcategory) {
+      subcategoryConfig = await CategoryConfig.findById(subcategory);
+      if (!subcategoryConfig) {
+        return res.status(400).json({ message: 'Subcategoría no encontrada' });
+      }
+      if (!subcategoryConfig.parentCategory || subcategoryConfig.parentCategory.toString() !== categoryConfig._id.toString()) {
+        return res.status(400).json({ message: 'La subcategoría no pertenece a la categoría seleccionada' });
+      }
+    }
 
     // Validar que el descuento esté entre 1% y 100%
     if (productData.discountPercent != null && (productData.discountPercent < 1 || productData.discountPercent > 100)) {
@@ -88,16 +129,19 @@ const createProduct = async (req, res) => {
 
     const product = await Product.create({
       ...productData,
+      category: categoryConfig._id,
+      categoryName: categoryConfig.name,
+      subcategory: subcategoryConfig?._id ?? null,
+      subcategoryName: subcategoryConfig ? subcategoryConfig.name : '',
       images: Array.isArray(images) ? images : [],
       availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
     });
 
-    
     if (productData.discountPercent && productData.discountPercent > 0) {
       await _sendDiscountNotification(product);
     }
 
-    res.status(201).json({ product });
+    res.status(201).json({ product: formatProductForResponse(product) });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -105,7 +149,7 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-    const { images, availableSizes, discountDurationDays, ...updateData } = req.body;
+    const { images, availableSizes, discountDurationDays, category, subcategory, ...updateData } = req.body;
 
     // Validar que el descuento esté entre 1% y 100%
     if (updateData.discountPercent != null && (updateData.discountPercent < 1 || updateData.discountPercent > 100)) {
@@ -120,12 +164,38 @@ const updateProduct = async (req, res) => {
       console.log(`Descuento actualizado, vigente hasta: ${endDate}`);
     }
 
-    // Obtener producto anterior para comparar descuentos
     const previousProduct = await Product.findById(req.params.id);
+    if (!previousProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
 
     const updatePayload = {
       ...updateData,
     };
+
+    const categoryId = category || previousProduct.category;
+    const categoryConfig = await CategoryConfig.findById(categoryId);
+    if (!categoryConfig) {
+      return res.status(400).json({ message: 'Categoría no encontrada' });
+    }
+    updatePayload.category = categoryConfig._id;
+    updatePayload.categoryName = categoryConfig.name;
+
+    let subcategoryConfig = null;
+    if (subcategory) {
+      subcategoryConfig = await CategoryConfig.findById(subcategory);
+      if (!subcategoryConfig) {
+        return res.status(400).json({ message: 'Subcategoría no encontrada' });
+      }
+      if (!subcategoryConfig.parentCategory || subcategoryConfig.parentCategory.toString() !== categoryConfig._id.toString()) {
+        return res.status(400).json({ message: 'La subcategoría no pertenece a la categoría seleccionada' });
+      }
+      updatePayload.subcategory = subcategoryConfig._id;
+      updatePayload.subcategoryName = subcategoryConfig.name;
+    } else if (subcategory === null || subcategory === undefined) {
+      updatePayload.subcategory = previousProduct.subcategory;
+      updatePayload.subcategoryName = previousProduct.subcategoryName;
+    }
 
     if (images !== undefined) {
       updatePayload.images = Array.isArray(images) ? images : [];
@@ -139,14 +209,13 @@ const updateProduct = async (req, res) => {
       req.params.id,
       updatePayload,
       { new: true, runValidators: true }
-    );
+    ).populate('category', 'name').populate('subcategory', 'name');
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Enviar notificación si se agregó o aumentó el descuento
-    const previousDiscount = previousProduct?.discountPercent || 0;
+    const previousDiscount = previousProduct.discountPercent || 0;
     const currentDiscount = product.discountPercent || 0;
     
     if (currentDiscount > previousDiscount && currentDiscount > 0) {
@@ -154,7 +223,7 @@ const updateProduct = async (req, res) => {
       await _sendDiscountNotification(product);
     }
 
-    res.json({ product });
+    res.json({ product: formatProductForResponse(product) });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
