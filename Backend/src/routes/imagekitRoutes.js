@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const { uploadImages } = require('../controllers/imagekitController');
+const { uploadImages, uploadDeliveryEvidence } = require('../controllers/imagekitController');
 const { protect } = require('../middlewares/authMiddleware');
 const authorize = require('../middlewares/roleMiddleware');
 
@@ -25,8 +25,17 @@ router.post(
   '/upload',
   protect,
   authorize('admin'),
-  upload.any(), // 👈 único cambio
+  upload.any(),
   uploadImages
+);
+
+// Endpoint para repartidores: subir evidencias de entrega
+router.post(
+  '/upload/delivery-evidence',
+  protect,
+  authorize('repartidor'),
+  upload.any(),
+  uploadDeliveryEvidence
 );
 
 module.exports = router;
