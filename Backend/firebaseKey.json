@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "daylishop",
+  "private_key_id": "d7553bf47570629886faa3ebbf406d367fe5cd1c",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCtzE+NKIlYQTQ8\nyOo6qMnVL/OHZVDR25fUwokMpGd6r8GrIITsWEIffYAQ524pp+pW8enqGGrzi2+L\n7gBUVQXzWy871VnPvF2dC6bdd5hpw5+XmwZccMrPg3dSPSS0bPQ9QYz8r+eSZmWU\nNAUtJIxHjHqGKgvbeg2slxu/DU/eicg8qbiDPkALLioO8c3WDPbCfUno9hDnmFIt\nBgn+AzsKk1+CFyP1pvbvf/jLo+clvEivJJRpDjw3ThP2YtI8lIpYrM8uPopQ8zmx\nJ7OgsFNtvGrkJ+dbCsBPpNyErpCEayD+GcEGZv0fVId6H/9sgP7uvshEnFoBjxm0\ntBsM7XlTAgMBAAECggEAA885JSpwzD7torFytONzPRmGeH7HhToPe2niMCVAYWeN\n0q7tSvLqTB9nmbdA6mfUUqCN1IRBf+IcCVCnsDGG5l0mzWRxSgTidmlFeJBBBnxz\nuJJ80rTkNSU4DdTqQ4wp1Ffl+7ntVP+qlVOIk4M8Eetp2hv804w61YAgaxEjIYkR\nW8y6sLLjD1AZk5kJPQTVJOmYY8zYhh3K7GeMPCFueG5OKbZG9DOYkhe/wYICH7jK\n7WCKjAS/FppdSyWqLaxZpR8DqKtr7ZssojaQFpNvegOuA7rYkwv/XsCOCQMgwcwO\nXgYMVgfisFS7nyygHKMYFgP9o/DjL/F22PpMTDJRIQKBgQDTjt5rlRKoxXLCpZ1g\n3tO/JQ/Z8GemMh1ZvvFk1eKz4Hkun2g43bUX1z3t3CsCAC6iN4p2bvFljH+CX3xk\nOlBKyfR29i27lwxBGYo8CU1NlFEo8UctWv0bhy4bSdNSNwe/wWf8zh0QwTR+s9MD\ngndit/iFAOZhurgKlTEwEZpR8wKBgQDSTsrEhdBj0qseCtuguegDWwBRg/bhOdWs\nNa6YNGTal3mEX8xLJyxGsNaylg1pEiSoTuLuBxHcClYd1uKhGFwSYtoQ0BCzdHiG\n0xpADc3DB3VpFQezVh3JXGRv3VsPzXdPZts5vGSG1oVEOXhT0IREyC5PZR7S+MG2\nByjfT1SzIQKBgDpT+KTmu/dGQQbDjKmJpg3cVQt8icc7p/X3fCyV/+QiLqcZEi4j\nimthT9TF0CHEFRdqgsV2fx3FZ951HyGvJjYIiltGMoO2+Iz2UrOMyQBrtRi5tSsf\nHAu78I1bhGT1gTBwTZBY75CQBD4urC4aiXnxSRa6kco+JcHdMmuTXt3bAoGBAI6t\noeb+Gcj/bdQt7Z73QS61mFu1OdLHV+1DZjYgpaOfTHPAQmtiIim7Y405O9Pi2TfO\nfSqbZURxRsdrt8kvK5fVtLffUNVO2U4u/goi00vTTZaDC/xhGkg4BHPYKyVnceBO\nmcBrzY+lDjig/L9wIaxAWxrGMclTtqf154bI3V/BAoGATLuPbp3/P70f8m9BXe2Q\nDGxAG8LqApAtX86NKimKFam6v/eRgpjpE5v7tWnWQth4TqsZ9dxC5HocnmRVp6wN\n5JiHKI3OteQUfwK0y+PCEd7414cBXtMHVUSHLZu5kEBsQp+AdZBH6K4fYKZ7+vwX\n3oqaoOGyTKJX3pUgi7Wi72o=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@daylishop.iam.gserviceaccount.com",
+  "client_id": "104594675100972567735",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40daylishop.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
