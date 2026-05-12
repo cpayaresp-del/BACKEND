@@ -1,6 +1,7 @@
 const DeliveryAssignment = require('../models/delivery');
 const Order = require('../models/order');
 const Product = require('../models/product');
+const User = require('../models/user');
 const admin = require('../config/firebase');
 const getMyDeliveries = async (req, res) => {
   try {
@@ -74,7 +75,10 @@ const updateDeliveryStatus = async (req, res) => {
     } else if (status === 'delivered') {
       delivery.deliveredAt = new Date();
       // Also update the order status to delivered
-      await Order.findByIdAndUpdate(delivery.orderId, { status: 'delivered' });
+      const order = await Order.findByIdAndUpdate(delivery.orderId, { status: 'delivered' });
+      if (order) {
+        await sendDeliveryNotification(order);
+      }
     }
 
     await delivery.save();
@@ -139,7 +143,10 @@ const addDeliveryEvidence = async (req, res) => {
     delivery.deliveredAt = new Date();
 
     // Update order status
-    await Order.findByIdAndUpdate(delivery.orderId, { status: 'delivered' });
+    const order = await Order.findByIdAndUpdate(delivery.orderId, { status: 'delivered' });
+    if (order) {
+      await sendDeliveryNotification(order);
+    }
 
     await delivery.save();
 
@@ -159,6 +166,38 @@ const addDeliveryEvidence = async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+const sendDeliveryNotification = async (order) => {
+  if (!admin) return;
+
+  const user = await User.findById(order.user);
+  if (!user || !user.fcmToken) return;
+
+  const message = {
+    notification: {
+      title: 'Pedido entregado',
+      body: `Tu pedido ${order._id.toString().slice(-6).toUpperCase()} ha sido entregado.`,
+    },
+    data: {
+      type: 'delivery',
+      orderId: order._id.toString(),
+    },
+    token: user.fcmToken,
+  };
+
+  try {
+    await admin.messaging().send(message);
+    console.log(`Notificación de entrega enviada a ${user.email}`);
+  } catch (error) {
+    console.error('Error enviando notificación de entrega:', error);
+    if (error?.code === 'messaging/registration-token-not-registered' ||
+        error?.code === 'messaging/invalid-registration-token' ||
+        error?.code === 'messaging/invalid-argument') {
+      await User.findByIdAndUpdate(user._id, { fcmToken: null });
+      console.log(`Token inválido removido para ${user.email}`);
+    }
   }
 };
 
