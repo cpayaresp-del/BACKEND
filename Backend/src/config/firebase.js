@@ -1,10 +1,10 @@
-let admin = null;
 const path = require('path');
 const fs = require('fs');
+let firebaseAdmin = null;
 
 // Verificar si firebase-admin está instalado
 try {
-  admin = require('firebase-admin');
+  const admin = require('firebase-admin');
   
   // Ruta al archivo de credenciales de Firebase
   const firebaseKeyPath = path.join(__dirname, '../../firebaseKey.json');
@@ -54,6 +54,7 @@ try {
     
     if (admin.apps && admin.apps.length > 0) {
       console.log('✅ Firebase Admin SDK listo para usar');
+      firebaseAdmin = admin;
     } else {
       console.warn('⚠️ Firebase no inicializado - admin.apps vacío');
     }
@@ -62,7 +63,7 @@ try {
   }
 } catch (error) {
   console.warn('⚠️ firebase-admin no está instalado. Para usar notificaciones push, ejecuta: npm install firebase-admin');
-  admin = null;
 }
 
-module.exports = admin;
+module.exports = firebaseAdmin;
+
