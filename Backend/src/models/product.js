@@ -23,13 +23,24 @@ const productSchema = new mongoose.Schema(
       default: 0,
     },
     category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CategoryConfig',
+      required: true,
+    },
+    categoryName: {
       type: String,
       required: true,
       trim: true,
     },
     subcategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CategoryConfig',
+      default: null,
+    },
+    subcategoryName: {
       type: String,
       trim: true,
+      default: '',
     },
     images: [
       {
