@@ -13,6 +13,7 @@ const router = express.Router();
 router.get('/:productId', getReviewsForProduct);
 
 // Rutas protegidas
+router.get('/can-review/:productId', protect, canReviewProduct);
 router.post('/', protect, createReview);
 router.get('/', protect, getUserReviews);
 
