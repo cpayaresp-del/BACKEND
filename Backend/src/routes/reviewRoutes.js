@@ -2,6 +2,7 @@ const express = require('express');
 const {
   createReview,
   getReviewsForProduct,
+  canReviewProduct,
   getUserReviews,
 } = require('../controllers/reviewController');
 
