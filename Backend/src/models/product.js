@@ -67,8 +67,21 @@ const productSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    rootCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CategoryConfig',
+      required: true,
+      description: 'La categoría principal (sin padre). Se usa para separar productos por "carpeta" principal.',
+    },
   },
   { timestamps: true }
 );
+
+// Índice compuesto para buscar productos por categoría principal y estado activo
+productSchema.index({ rootCategory: 1, isActive: 1 });
+// Índice para buscar productos por categoría principal y subcategoría
+productSchema.index({ rootCategory: 1, category: 1, subcategory: 1 });
+// Índice para búsqueda de productos con nombre dentro de una categoría
+productSchema.index({ rootCategory: 1, name: 'text', isActive: 1 });
 
 module.exports = mongoose.model('Product', productSchema);
