@@ -70,6 +70,41 @@ const getReviewsForProduct = async (req, res) => {
   }
 };
 
+// @desc    Verificar si el usuario puede reseñar un producto
+// @route   GET /api/reviews/can-review/:productId
+// @access  Private
+const canReviewProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user._id;
+
+    const hasPurchased = await Order.findOne({
+      user: userId,
+      status: 'delivered',
+      'items.product': productId,
+    });
+
+    if (!hasPurchased) {
+      return res.status(200).json({
+        canReview: false,
+        message: 'Solo puedes reseñar productos que has comprado.',
+      });
+    }
+
+    const existingReview = await Review.findOne({ user: userId, product: productId });
+    if (existingReview) {
+      return res.status(200).json({
+        canReview: false,
+        message: 'Ya has reseñado este producto.',
+      });
+    }
+
+    res.status(200).json({ canReview: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Obtener reseñas del usuario actual
 // @route   GET /api/reviews
 // @access  Private
@@ -90,5 +125,6 @@ const getUserReviews = async (req, res) => {
 module.exports = {
   createReview,
   getReviewsForProduct,
+  canReviewProduct,
   getUserReviews,
 };
