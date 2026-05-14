@@ -57,6 +57,20 @@ const productSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    colorVariants: [
+      {
+        name: {
+          type: String,
+          trim: true,
+          required: true,
+        },
+        price: {
+          type: Number,
+          min: 0,
+          default: null,
+        },
+      },
+    ],
     discountPercent: {
       type: Number,
       min: 1,
@@ -85,3 +99,4 @@ productSchema.index({ rootCategory: 1, category: 1, subcategory: 1 });
 productSchema.index({ rootCategory: 1, name: 'text', isActive: 1 });
 
 module.exports = mongoose.model('Product', productSchema);
+
