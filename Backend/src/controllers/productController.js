@@ -1,7 +1,32 @@
+
 const Product = require('../models/product');
 const User = require('../models/user');
 const CategoryConfig = require('../models/categoryConfig');
 const admin = require('../config/firebase');
+
+// Función helper para obtener la categoría raíz (principal/padre más arriba en la jerarquía)
+const getRootCategory = async (categoryId) => {
+  let category = await CategoryConfig.findById(categoryId);
+  while (category && category.parentCategory) {
+    category = await CategoryConfig.findById(category.parentCategory);
+  }
+  return category ? category._id : categoryId;
+};
+
+const normalizeColorVariants = (colorVariants) => {
+  if (!Array.isArray(colorVariants)) return [];
+  return colorVariants
+    .map((variant) => {
+      if (!variant || typeof variant !== 'object') return null;
+      const name = String(variant.name || '').trim();
+      if (!name) return null;
+      const price = variant.price != null && variant.price !== ''
+        ? Number(variant.price)
+        : null;
+      return { name, price };
+    })
+    .filter((variant) => variant !== null);
+};
 
 // Función helper para obtener todos los IDs de categorías descendientes
 const getDescendantCategoryIds = async (parentId) => {
@@ -42,16 +67,14 @@ const getProducts = async (req, res) => {
     const query = { isActive: true };
 
     if (category) {
-      const categories = category
+      const categoryIds = category
         .split(',')
         .map((cat) => cat.trim())
         .filter((cat) => cat.length > 0);
 
-      if (categories.length > 0) {
-        query.$or = [
-          { category: { $in: categories } },
-          { subcategory: { $in: categories } },
-        ];
+      if (categoryIds.length > 0) {
+        // Buscar productos que tienen rootCategory en la lista de IDs pasados
+        query.rootCategory = { $in: categoryIds };
       }
     }
     if (search) query.name = { $regex: search, $options: 'i' };
@@ -92,7 +115,7 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { images, availableSizes, discountDurationDays, category, subcategory, ...productData } = req.body;
+    const { images, availableSizes, discountDurationDays, category, subcategory, colorVariants, ...productData } = req.body;
 
     if (!category) {
       return res.status(400).json({ message: 'La categoría es requerida' });
@@ -102,6 +125,9 @@ const createProduct = async (req, res) => {
     if (!categoryConfig) {
       return res.status(400).json({ message: 'Categoría no encontrada' });
     }
+
+    // Calcular rootCategory (la categoría principal sin padre)
+    const rootCategory = await getRootCategory(category);
 
     let subcategoryConfig = null;
     if (subcategory) {
@@ -133,8 +159,10 @@ const createProduct = async (req, res) => {
       categoryName: categoryConfig.name,
       subcategory: subcategoryConfig?._id ?? null,
       subcategoryName: subcategoryConfig ? subcategoryConfig.name : '',
+      rootCategory: rootCategory,
       images: Array.isArray(images) ? images : [],
       availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
+      colorVariants: normalizeColorVariants(colorVariants),
     });
 
     if (productData.discountPercent && productData.discountPercent > 0) {
@@ -149,7 +177,7 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-    const { images, availableSizes, discountDurationDays, category, subcategory, ...updateData } = req.body;
+    const { images, availableSizes, discountDurationDays, category, subcategory, colorVariants, ...updateData } = req.body;
 
     // Validar que el descuento esté entre 1% y 100%
     if (updateData.discountPercent != null && (updateData.discountPercent < 1 || updateData.discountPercent > 100)) {
@@ -180,6 +208,10 @@ const updateProduct = async (req, res) => {
     }
     updatePayload.category = categoryConfig._id;
     updatePayload.categoryName = categoryConfig.name;
+    
+    // Calcular rootCategory (la categoría principal sin padre)
+    const rootCategory = await getRootCategory(categoryId);
+    updatePayload.rootCategory = rootCategory;
 
     let subcategoryConfig = null;
     if (subcategory) {
@@ -203,6 +235,10 @@ const updateProduct = async (req, res) => {
 
     if (availableSizes !== undefined) {
       updatePayload.availableSizes = Array.isArray(availableSizes) ? availableSizes : [];
+    }
+
+    if (colorVariants !== undefined) {
+      updatePayload.colorVariants = normalizeColorVariants(colorVariants);
     }
 
     const product = await Product.findByIdAndUpdate(
@@ -308,4 +344,46 @@ const _sendDiscountNotification = async (product) => {
   }
 };
 
-module.exports = { getProducts, getProduct, createProduct, updateProduct, deleteProduct };
+const getSimilarProducts = async (req, res) => {
+  try {
+    const { limit = 4 } = req.query;
+    const product = await Product.findById(req.params.id);
+    if (!product || !product.isActive) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    let query = {
+      isActive: true,
+      _id: { $ne: product._id },
+      rootCategory: product.rootCategory,
+    };
+
+    if (product.subcategory) {
+      query.subcategory = product.subcategory;
+    } else {
+      query.category = product.category;
+    }
+
+    let similar = await Product.find(query)
+      .limit(Number(limit))
+      .populate('category', 'name')
+      .populate('subcategory', 'name');
+
+    if (similar.length === 0) {
+      similar = await Product.find({
+        isActive: true,
+        _id: { $ne: product._id },
+        rootCategory: product.rootCategory,
+      })
+        .limit(Number(limit))
+        .populate('category', 'name')
+        .populate('subcategory', 'name');
+    }
+
+    res.json({ products: similar.map(formatProductForResponse) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getProducts, getProduct, createProduct, updateProduct, deleteProduct, getSimilarProducts };
