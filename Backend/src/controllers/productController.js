@@ -1,4 +1,3 @@
-
 const Product = require('../models/product');
 const User = require('../models/user');
 const CategoryConfig = require('../models/categoryConfig');
@@ -73,8 +72,13 @@ const getProducts = async (req, res) => {
         .filter((cat) => cat.length > 0);
 
       if (categoryIds.length > 0) {
-        // Buscar productos que tienen rootCategory en la lista de IDs pasados
-        query.rootCategory = { $in: categoryIds };
+        // Buscar productos que tengan la categoría en: rootCategory, category, o subcategory
+        // Esto permite filtrar tanto categorías principales como subcategorías
+        query.$or = [
+          { rootCategory: { $in: categoryIds } },
+          { category: { $in: categoryIds } },
+          { subcategory: { $in: categoryIds } }
+        ];
       }
     }
     if (search) query.name = { $regex: search, $options: 'i' };
