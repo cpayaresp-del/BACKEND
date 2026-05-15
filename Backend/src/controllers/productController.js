@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Product = require('../models/product');
 const User = require('../models/user');
 const CategoryConfig = require('../models/categoryConfig');
@@ -68,6 +69,38 @@ const getIdFromField = (field) => {
   return null;
 };
 
+const escapeRegExp = (string) =>
+  String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const normalizeObjectId = (field) => {
+  const id = getIdFromField(field);
+  return mongoose.isValidObjectId(id) ? id : null;
+};
+
+const resolveCategoryFilterIds = async (rawValues) => {
+  const ids = [];
+  const names = [];
+
+  for (const raw of rawValues) {
+    const value = String(raw).trim();
+    if (!value) continue;
+    if (mongoose.isValidObjectId(value)) {
+      ids.push(value);
+    } else {
+      names.push(value);
+    }
+  }
+
+  if (names.length > 0) {
+    const categories = await CategoryConfig.find({
+      name: { $in: names.map((name) => new RegExp(`^${escapeRegExp(name)}$`, 'i')) },
+    }).select('_id');
+    categories.forEach((category) => ids.push(category._id.toString()));
+  }
+
+  return [...new Set(ids)];
+};
+
 const formatProductForResponse = (product) => {
   const obj = product.toObject();
   return {
@@ -75,13 +108,13 @@ const formatProductForResponse = (product) => {
     category: obj.categoryName || (product.category?.name ?? ''),
     categoryId:
       typeof obj.category === 'string'
-        ? obj.category
-        : getIdFromField(obj.category) || getIdFromField(product.category),
+        ? (mongoose.isValidObjectId(obj.category) ? obj.category : null)
+        : normalizeObjectId(obj.category) || normalizeObjectId(product.category),
     subcategory: obj.subcategoryName || (product.subcategory?.name ?? ''),
     subcategoryId:
       typeof obj.subcategory === 'string'
-        ? obj.subcategory
-        : getIdFromField(obj.subcategory) || getIdFromField(product.subcategory),
+        ? (mongoose.isValidObjectId(obj.subcategory) ? obj.subcategory : null)
+        : normalizeObjectId(obj.subcategory) || normalizeObjectId(product.subcategory),
   };
 };
 
@@ -115,19 +148,24 @@ const getProducts = async (req, res) => {
     let searchFilters = null;
 
     if (category) {
-      const categoryIds = category
+      const rawCategoryValues = category
         .split(',')
         .map((cat) => cat.trim())
         .filter((cat) => cat.length > 0);
 
-      if (categoryIds.length > 0) {
-        // Buscar productos que tengan la categoría en: rootCategory, category, o subcategory
-        // Esto permite filtrar tanto categorías principales como subcategorías
-        categoryFilters = [
-          { rootCategory: { $in: categoryIds } },
-          { category: { $in: categoryIds } },
-          { subcategory: { $in: categoryIds } },
-        ];
+      if (rawCategoryValues.length > 0) {
+        const categoryIds = await resolveCategoryFilterIds(rawCategoryValues);
+        if (categoryIds.length > 0) {
+          // Buscar productos que tengan la categoría en: rootCategory, category, o subcategory
+          // Esto permite filtrar tanto categorías principales como subcategorías
+          categoryFilters = [
+            { rootCategory: { $in: categoryIds } },
+            { category: { $in: categoryIds } },
+            { subcategory: { $in: categoryIds } },
+          ];
+        } else {
+          query._id = { $in: [] };
+        }
       }
     }
 
