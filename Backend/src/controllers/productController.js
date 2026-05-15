@@ -59,21 +59,41 @@ const getDescendantCategoryIds = async (parentId) => {
   return descendants;
 };
 
+const getIdFromField = (field) => {
+  if (typeof field === 'string') return field;
+  if (field && typeof field === 'object') {
+    if (field._id) return field._id?.toString?.();
+    return field.toString?.();
+  }
+  return null;
+};
+
 const formatProductForResponse = (product) => {
   const obj = product.toObject();
   return {
     ...obj,
     category: obj.categoryName || (product.category?.name ?? ''),
     categoryId:
-      obj.category?.toString?.() ||
-      (product.category?._id?.toString?.() ?? null) ||
-      null,
+      typeof obj.category === 'string'
+        ? obj.category
+        : getIdFromField(obj.category) || getIdFromField(product.category),
     subcategory: obj.subcategoryName || (product.subcategory?.name ?? ''),
     subcategoryId:
-      obj.subcategory?.toString?.() ||
-      (product.subcategory?._id?.toString?.() ?? null) ||
-      null,
+      typeof obj.subcategory === 'string'
+        ? obj.subcategory
+        : getIdFromField(obj.subcategory) || getIdFromField(product.subcategory),
   };
+};
+
+const parseDiscountDuration = (value) => {
+  if (value == null) return null;
+  const raw = String(value).trim().toLowerCase();
+  const match = raw.match(/^(\d+)([dh])?$/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const unit = match[2] === 'h' ? 'hours' : 'days';
+  return { amount, unit };
 };
 
 const generateDescriptionWithAI = async (data) => {
@@ -167,7 +187,7 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { images, availableSizes, discountDurationDays, category, subcategory, colorVariants, ...productData } = req.body;
+    const { images, availableSizes, discountDuration, discountDurationDays, category, subcategory, colorVariants, ...productData } = req.body;
 
     if (!category) {
       return res.status(400).json({ message: 'La categoría es requerida' });
@@ -197,10 +217,22 @@ const createProduct = async (req, res) => {
       return res.status(400).json({ message: 'El descuento debe estar entre 1% y 100%' });
     }
 
+    const parsedDiscountDuration = parseDiscountDuration(
+      discountDuration ?? (discountDurationDays ? `${discountDurationDays}d` : null)
+    );
+
     // Calcular la fecha de fin del descuento si se proporciona duración
-    if (productData.discountPercent != null && productData.discountPercent > 0 && discountDurationDays && discountDurationDays > 0) {
+    if (
+      productData.discountPercent != null &&
+      productData.discountPercent > 0 &&
+      parsedDiscountDuration
+    ) {
       const endDate = new Date();
-      endDate.setDate(endDate.getDate() + parseInt(discountDurationDays));
+      if (parsedDiscountDuration.unit === 'hours') {
+        endDate.setHours(endDate.getHours() + parsedDiscountDuration.amount);
+      } else {
+        endDate.setDate(endDate.getDate() + parsedDiscountDuration.amount);
+      }
       productData.discountEndDate = endDate;
       console.log(`Descuento vigente hasta: ${endDate}`);
     }
@@ -243,7 +275,11 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-    const { images, availableSizes, discountDurationDays, category, subcategory, colorVariants, ...updateData } = req.body;
+    const { images, availableSizes, discountDuration, discountDurationDays, category, subcategory, colorVariants, ...updateData } = req.body;
+
+    const parsedDiscountDuration = parseDiscountDuration(
+      discountDuration ?? (discountDurationDays ? `${discountDurationDays}d` : null)
+    );
 
     // Validar que el descuento esté entre 1% y 100%
     if (updateData.discountPercent != null && (updateData.discountPercent < 1 || updateData.discountPercent > 100)) {
@@ -251,9 +287,17 @@ const updateProduct = async (req, res) => {
     }
 
     // Calcular la fecha de fin del descuento si se proporciona duración
-    if (updateData.discountPercent != null && updateData.discountPercent > 0 && discountDurationDays && discountDurationDays > 0) {
+    if (
+      updateData.discountPercent != null &&
+      updateData.discountPercent > 0 &&
+      parsedDiscountDuration
+    ) {
       const endDate = new Date();
-      endDate.setDate(endDate.getDate() + parseInt(discountDurationDays));
+      if (parsedDiscountDuration.unit === 'hours') {
+        endDate.setHours(endDate.getHours() + parsedDiscountDuration.amount);
+      } else {
+        endDate.setDate(endDate.getDate() + parsedDiscountDuration.amount);
+      }
       updateData.discountEndDate = endDate;
       console.log(`Descuento actualizado, vigente hasta: ${endDate}`);
     }
