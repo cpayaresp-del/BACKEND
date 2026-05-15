@@ -16,7 +16,7 @@ const generateProductDescription = async ({
       'GOOGLE_API_KEY no está configurada. Se devolverá una descripción genérica.'
     );
 
-    return `${name} es un producto versátil y de alta calidad, diseñado para destacar por sus características y comodidad. Perfecto para quienes buscan una opción confiable y con estilo.`;
+    return `${name} combina comodidad, estilo y excelente calidad en un diseño pensado para destacar en cualquier ocasión. Su apariencia moderna y materiales resistentes lo convierten en una opción ideal para quienes buscan una experiencia cómoda y atractiva al mismo tiempo.`;
   }
 
   const sizeText =
@@ -28,12 +28,12 @@ const generateProductDescription = async ({
   const variantText =
     Array.isArray(colorVariants) &&
     colorVariants.length > 0
-      ? `Variantes: ${colorVariants
+      ? `Variantes disponibles: ${colorVariants
           .map(
             (variant) =>
               `${variant.name}${
                 variant.price != null
-                  ? ` a ${variant.price} unidades`
+                  ? ` con precio de ${variant.price}`
                   : ''
               }`
           )
@@ -41,20 +41,35 @@ const generateProductDescription = async ({
       : '';
 
   const discountText = discountPercent
-    ? ` Actualmente con descuento del ${discountPercent}%.`
+    ? `Actualmente cuenta con un descuento del ${discountPercent}%.`
     : '';
 
   const prompt = `
-Eres un redactor experto en descripciones comerciales para e-commerce en español.
+Actúa como un copywriter profesional especializado en moda y calzado para e-commerce.
 
-Genera una descripción larga y persuasiva para este producto.
-Escribe un solo párrafo de al menos 90 palabras, con al menos 4 oraciones completas.
-Enfócate en los beneficios del producto, cómo se siente, y por qué el cliente debe comprarlo.
-No uses listas, viñetas ni numeraciones.
-No menciones la categoría, subcategoría ni el contexto de la tienda.
-No comiences con "Producto" y no termines la descripción de forma abrupta.
+Genera una descripción comercial larga, profesional y natural para este producto.
 
-Nombre del producto: ${name}
+La descripción debe:
+- sonar completamente humana
+- transmitir calidad, comodidad y estilo
+- resaltar diseño, elegancia y versatilidad
+- explicar por qué vale la pena comprarlo
+- tener entre 120 y 180 palabras
+- escribirse en un único párrafo
+- terminar correctamente
+- evitar frases exageradas o fantasiosas
+- NO usar frases típicas de IA como:
+  "sumérgete en un universo"
+  "descubre una experiencia única"
+  "lleva tu estilo al siguiente nivel"
+- NO usar listas ni viñetas
+- NO repetir palabras constantemente
+- NO mencionar categorías ni subcategorías
+- NO inventar características inexistentes
+
+Información del producto:
+
+Nombre: ${name}
 
 ${sizeText}
 
@@ -62,7 +77,7 @@ ${variantText}
 
 ${discountText}
 
-Entrega un texto fluido y atractivo que invite a la compra.
+Genera únicamente la descripción final.
 `;
 
   const requestBody = {
@@ -76,8 +91,10 @@ Entrega un texto fluido y atractivo que invite a la compra.
       },
     ],
     generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 750,
+      temperature: 0.4,
+      maxOutputTokens: 1200,
+      topP: 0.8,
+      topK: 40,
     },
   };
 
@@ -117,14 +134,12 @@ Entrega un texto fluido y atractivo que invite a la compra.
 
   if (
     typeof output === 'string' &&
-    output.trim().length > 0
+    output.trim().length > 30
   ) {
     return output.trim();
   }
 
-  return `Producto ${name} en la categoría ${categoryName}${
-    subcategoryName ? `, ${subcategoryName}` : ''
-  }. Calidad y estilo para tu compra.`;
+  return `${name} ofrece una combinación ideal entre diseño moderno, comodidad y calidad, convirtiéndose en una excelente opción para quienes buscan un producto atractivo y funcional. Su estilo versátil permite adaptarlo fácilmente a diferentes ocasiones, brindando una apariencia elegante y cómoda en el día a día.`;
 };
 
 module.exports = {
