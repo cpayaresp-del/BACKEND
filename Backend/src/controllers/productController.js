@@ -23,7 +23,12 @@ const normalizeColorVariants = (colorVariants) => {
       const price = variant.price != null && variant.price !== ''
         ? Number(variant.price)
         : null;
-      return { name, price };
+      const images = Array.isArray(variant.images)
+        ? variant.images
+            .filter((img) => typeof img === 'string' && img.trim().length > 0)
+            .map((img) => img.trim())
+        : [];
+      return { name, price, images };
     })
     .filter((variant) => variant !== null);
 };
