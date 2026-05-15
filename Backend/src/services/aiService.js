@@ -27,7 +27,7 @@ const generateProductDescription = async ({
 
   const discountText = discountPercent ? ` Actualmente con descuento del ${discountPercent}%.` : '';
 
-  const prompt = `Escribe una descripción de producto en español para un sitio de e-commerce. Usa un tono atractivo, directo y enfocado en venta. Incluye la categoría, subcategoría si está disponible, y menciona características relevantes.
+  const prompt = `Eres un redactor experto en descripciones comerciales para e-commerce en español. Genera una descripción de producto larga, atractiva y orientada a la venta. Usa al menos 3 oraciones completas y menciona, características del producto, talles disponibles y variantes de color cuando haya.
 
 Nombre del producto: ${name}
 Categoría: ${categoryName}
@@ -36,12 +36,12 @@ ${sizeText}
 ${variantText}
 ${discountText}
 
-Devuelve sólo la descripción en un párrafo conciso.`;
+Entrega un solo párrafo de texto fluido, sin listas ni viñetas, y no comiences con "Producto".`;
 
   const response = await client.responses.create({
     model: 'gpt-4.1-mini',
     input: prompt,
-    max_output_tokens: 200,
+    max_output_tokens: 300,
   });
 
   const output = response.output?.[0]?.content?.[0]?.text;
