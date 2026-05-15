@@ -1,69 +1,118 @@
 const mongoose = require('mongoose');
 
-const orderItemSchema = new mongoose.Schema(
+const productSchema = new mongoose.Schema(
   {
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true,
-    },
     name: {
       type: String,
       required: true,
+      trim: true,
     },
-    quantity: {
-      type: Number,
+    description: {
+      type: String,
       required: true,
-      min: 1,
     },
     price: {
       type: Number,
       required: true,
+      min: 0,
     },
-  },
-  { _id: false }
-);
-
-const orderSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    items: [orderItemSchema],
-    total: {
+    stock: {
       type: Number,
       required: true,
+      min: 0,
+      default: 0,
     },
-    status: {
-      type: String,
-      enum: ['pending', 'paid', 'processing', 'assigned', 'shipped', 'delivered', 'cancelled'],
-      default: 'pending',
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CategoryConfig',
+      required: true,
     },
-    paymentId: {
+    categoryName: {
       type: String,
+      required: true,
+      trim: true,
+    },
+    subcategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CategoryConfig',
       default: null,
     },
-    paymentStatus: {
+    subcategoryName: {
       type: String,
-      enum: ['pending', 'approved', 'rejected', 'in_process', 'paid'],
-      default: 'pending',
-    },
-    shippingAddress: {
-      type: String,
+      trim: true,
       default: '',
     },
-    neighborhood: {
-      type: String,
-      default: '',
+    images: [
+      {
+        type: String,
+      },
+    ],
+    isActive: {
+      type: Boolean,
+      default: true,
     },
-    city: {
-      type: String,
-      default: '',
+    availableSizes: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    colorVariants: [
+      {
+        name: {
+          type: String,
+          trim: true,
+          required: true,
+        },
+        price: {
+          type: Number,
+          min: 0,
+          default: null,
+        },
+        stock: {
+          type: Number,
+          min: 0,
+          default: null,
+        },
+        images: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
+        availableSizes: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
+      },
+    ],
+    discountPercent: {
+      type: Number,
+      min: 1,
+      max: 100,
+      default: null,
+    },
+    discountEndDate: {
+      type: Date,
+      default: null,
+    },
+    rootCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CategoryConfig',
+      required: true,
+      description: 'La categoría principal (sin padre). Se usa para separar productos por "carpeta" principal.',
     },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Order', orderSchema);
+// Índice compuesto para buscar productos por categoría principal y estado activo
+productSchema.index({ rootCategory: 1, isActive: 1 });
+// Índice para buscar productos por categoría principal y subcategoría
+productSchema.index({ rootCategory: 1, category: 1, subcategory: 1 });
+// Índice para búsqueda de productos con nombre dentro de una categoría
+productSchema.index({ rootCategory: 1, name: 'text', isActive: 1 });
+
+module.exports = mongoose.model('Product', productSchema);
