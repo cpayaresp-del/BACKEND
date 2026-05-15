@@ -69,6 +69,12 @@ const productSchema = new mongoose.Schema(
           min: 0,
           default: null,
         },
+        images: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
       },
     ],
     discountPercent: {
@@ -99,4 +105,3 @@ productSchema.index({ rootCategory: 1, category: 1, subcategory: 1 });
 productSchema.index({ rootCategory: 1, name: 'text', isActive: 1 });
 
 module.exports = mongoose.model('Product', productSchema);
-
