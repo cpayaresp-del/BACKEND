@@ -26,11 +26,9 @@ const generateProductDescription = async ({
 
   const discountText = discountPercent ? ` Actualmente con descuento del ${discountPercent}%.` : '';
 
-  const prompt = `Eres un redactor experto en descripciones comerciales para e-commerce en español. Genera una descripción de producto larga, atractiva y orientada a la venta. Usa al menos 3 oraciones completas y menciona categoría, subcategoría, características del producto, talles disponibles y variantes de color cuando haya.
+  const prompt = `Eres un redactor experto en descripciones comerciales para e-commerce en español. Genera una descripción de producto larga, atractiva y orientada a la venta. Usa al menos 3 oraciones completas y enfócate únicamente en el producto, sus características y por qué debe comprarse. No menciones la categoría, subcategoría ni el contexto de la tienda.
 
 Nombre del producto: ${name}
-Categoría: ${categoryName}
-Subcategoría: ${subcategoryName || 'No aplica'}
 ${sizeText}
 ${variantText}
 ${discountText}
@@ -56,7 +54,22 @@ Entrega un solo párrafo de texto fluido, sin listas ni viñetas, y no comiences
     }
   );
 
-  const json = await response.json();
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Gemini API error ${response.status} ${response.statusText}: ${responseText}`
+    );
+  }
+
+  let json;
+  try {
+    json = responseText ? JSON.parse(responseText) : null;
+  } catch (parseError) {
+    throw new Error(
+      `Gemini JSON parse error: ${parseError.message}. Raw body: ${responseText}`
+    );
+  }
+
   const output = json?.candidates?.[0]?.output;
   if (typeof output === 'string' && output.trim().length > 0) {
     return output.trim();
