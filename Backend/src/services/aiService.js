@@ -1,5 +1,6 @@
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_MODEL = process.env.GOOGLE_MODEL || 'gemini-1.5';
+const GOOGLE_MODEL_FALLBACK = process.env.GOOGLE_MODEL_FALLBACK || 'text-bison-001';
 
 const generateProductDescription = async ({
   name,
@@ -43,39 +44,61 @@ Entrega un solo párrafo de texto fluido, sin listas ni viñetas, y no comiences
     maxOutputTokens: 300,
   };
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta2/models/${GOOGLE_MODEL}:generateText?key=${GOOGLE_API_KEY}`,
-    {
+  const callGemini = async (model, endpoint) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta2/models/${model}:${endpoint}?key=${GOOGLE_API_KEY}`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      const error = new Error(
+        `Gemini API error ${response.status} ${response.statusText}: ${responseText}`
+      );
+      error.status = response.status;
+      throw error;
     }
-  );
 
-  const responseText = await response.text();
-  if (!response.ok) {
-    throw new Error(
-      `Gemini API error ${response.status} ${response.statusText}: ${responseText}`
-    );
-  }
+    let json;
+    try {
+      json = responseText ? JSON.parse(responseText) : null;
+    } catch (parseError) {
+      throw new Error(
+        `Gemini JSON parse error: ${parseError.message}. Raw body: ${responseText}`
+      );
+    }
 
-  let json;
+    const output = json?.candidates?.[0]?.output || json?.output?.[0]?.content?.[0]?.text;
+    if (typeof output === 'string' && output.trim().length > 0) {
+      return output.trim();
+    }
+
+    throw new Error(`Gemini response did not contain a valid output. Raw body: ${responseText}`);
+  };
+
+  const tryAlternateEndpoints = async (model) => {
+    try {
+      return await callGemini(model, 'generateText');
+    } catch (primaryError) {
+      if (primaryError.status === 404) {
+        return await callGemini(model, 'generate');
+      }
+      throw primaryError;
+    }
+  };
+
   try {
-    json = responseText ? JSON.parse(responseText) : null;
-  } catch (parseError) {
-    throw new Error(
-      `Gemini JSON parse error: ${parseError.message}. Raw body: ${responseText}`
-    );
+    return await tryAlternateEndpoints(GOOGLE_MODEL);
+  } catch (error) {
+    if (GOOGLE_MODEL_FALLBACK && GOOGLE_MODEL_FALLBACK !== GOOGLE_MODEL) {
+      return await tryAlternateEndpoints(GOOGLE_MODEL_FALLBACK);
+    }
+    throw error;
   }
-
-  const output = json?.candidates?.[0]?.output;
-  if (typeof output === 'string' && output.trim().length > 0) {
-    return output.trim();
-  }
-
-  return `Producto ${name} en la categoría ${categoryName}${subcategoryName ? `, ${subcategoryName}` : ''}. Calidad y estilo para tu compra.`;
 };
 
 module.exports = { generateProductDescription };
