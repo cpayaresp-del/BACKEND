@@ -47,10 +47,9 @@ const generateProductDescription = async ({
   const prompt = `
 Eres un redactor experto en descripciones comerciales para e-commerce en español.
 
-Genera una descripción de producto larga, atractiva y orientada a la venta.
-
-Usa al menos 3 oraciones completas y enfócate únicamente en el producto, sus características y por qué debe comprarse.
-
+Genera una descripción larga, detallada y orientada a la venta para este producto.
+Usa al menos 4 oraciones completas y enfócate solo en el producto, sus beneficios y por qué el cliente debería comprarlo.
+No hagas listas ni viñetas.
 No menciones la categoría, subcategoría ni el contexto de la tienda.
 
 Nombre del producto: ${name}
@@ -61,7 +60,7 @@ ${variantText}
 
 ${discountText}
 
-Entrega un solo párrafo de texto fluido, sin listas ni viñetas, y no comiences con "Producto".
+Entrega un solo párrafo de texto fluido y no comiences con "Producto".
 `;
 
   const requestBody = {
@@ -76,7 +75,7 @@ Entrega un solo párrafo de texto fluido, sin listas ni viñetas, y no comiences
     ],
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 300,
+      maxOutputTokens: 500,
     },
   };
 
