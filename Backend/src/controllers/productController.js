@@ -2,6 +2,7 @@ const Product = require('../models/product');
 const User = require('../models/user');
 const CategoryConfig = require('../models/categoryConfig');
 const admin = require('../config/firebase');
+const aiService = require('../services/aiService');
 
 // Función helper para obtener la categoría raíz (principal/padre más arriba en la jerarquía)
 const getRootCategory = async (categoryId) => {
@@ -60,10 +61,23 @@ const formatProductForResponse = (product) => {
   };
 };
 
+const generateDescriptionWithAI = async (data) => {
+  try {
+    const description = await aiService.generateProductDescription(data);
+    return description || `Producto ${data.name} listo para agregar a tu tienda.`;
+  } catch (error) {
+    console.error('Error generando descripción AI:', error);
+    return `Producto ${data.name} en la categoría ${data.categoryName}.`;
+  }
+};
+
 const getProducts = async (req, res) => {
   try {
     const { category, search, page = 1, limit = 100 } = req.query;
     const query = { isActive: true };
+
+    let categoryFilters = null;
+    let searchFilters = null;
 
     if (category) {
       const categoryIds = category
@@ -74,14 +88,33 @@ const getProducts = async (req, res) => {
       if (categoryIds.length > 0) {
         // Buscar productos que tengan la categoría en: rootCategory, category, o subcategory
         // Esto permite filtrar tanto categorías principales como subcategorías
-        query.$or = [
+        categoryFilters = [
           { rootCategory: { $in: categoryIds } },
           { category: { $in: categoryIds } },
-          { subcategory: { $in: categoryIds } }
+          { subcategory: { $in: categoryIds } },
         ];
       }
     }
-    if (search) query.name = { $regex: search, $options: 'i' };
+
+    if (search) {
+      searchFilters = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { categoryName: { $regex: search, $options: 'i' } },
+        { subcategoryName: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (categoryFilters && searchFilters) {
+      query.$and = [
+        { $or: categoryFilters },
+        { $or: searchFilters },
+      ];
+    } else if (categoryFilters) {
+      query.$or = categoryFilters;
+    } else if (searchFilters) {
+      query.$or = searchFilters;
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [products, total] = await Promise.all([
@@ -157,6 +190,20 @@ const createProduct = async (req, res) => {
       console.log(`Descuento vigente hasta: ${endDate}`);
     }
 
+    const normalizedVariants = normalizeColorVariants(colorVariants);
+    const sizes = Array.isArray(availableSizes) ? availableSizes : [];
+
+    if (!productData.description || !productData.description.trim()) {
+      productData.description = await generateDescriptionWithAI({
+        name: productData.name,
+        categoryName: categoryConfig.name,
+        subcategoryName: subcategoryConfig ? subcategoryConfig.name : '',
+        availableSizes: sizes,
+        colorVariants: normalizedVariants,
+        discountPercent: productData.discountPercent,
+      });
+    }
+
     const product = await Product.create({
       ...productData,
       category: categoryConfig._id,
@@ -165,8 +212,8 @@ const createProduct = async (req, res) => {
       subcategoryName: subcategoryConfig ? subcategoryConfig.name : '',
       rootCategory: rootCategory,
       images: Array.isArray(images) ? images : [],
-      availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
-      colorVariants: normalizeColorVariants(colorVariants),
+      availableSizes: sizes,
+      colorVariants: normalizedVariants,
     });
 
     if (productData.discountPercent && productData.discountPercent > 0) {
@@ -201,8 +248,15 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    const normalizedVariants = colorVariants !== undefined ? normalizeColorVariants(colorVariants) : previousProduct.colorVariants;
+    const sizes = availableSizes !== undefined
+      ? (Array.isArray(availableSizes) ? availableSizes : previousProduct.availableSizes)
+      : previousProduct.availableSizes;
+
     const updatePayload = {
       ...updateData,
+      availableSizes: sizes,
+      colorVariants: normalizedVariants,
     };
 
     const categoryId = category || previousProduct.category;
@@ -237,12 +291,20 @@ const updateProduct = async (req, res) => {
       updatePayload.images = Array.isArray(images) ? images : [];
     }
 
-    if (availableSizes !== undefined) {
-      updatePayload.availableSizes = Array.isArray(availableSizes) ? availableSizes : [];
-    }
-
-    if (colorVariants !== undefined) {
-      updatePayload.colorVariants = normalizeColorVariants(colorVariants);
+    if (!updatePayload.description || !updatePayload.description.trim()) {
+      const finalName = updatePayload.name || previousProduct.name;
+      const finalCategoryName = categoryConfig.name;
+      const finalSubcategoryName = subcategoryConfig
+        ? subcategoryConfig.name
+        : previousProduct.subcategoryName || '';
+      updatePayload.description = await generateDescriptionWithAI({
+        name: finalName,
+        categoryName: finalCategoryName,
+        subcategoryName: finalSubcategoryName,
+        availableSizes: updatePayload.availableSizes,
+        colorVariants: updatePayload.colorVariants,
+        discountPercent: updatePayload.discountPercent || previousProduct.discountPercent,
+      });
     }
 
     const product = await Product.findByIdAndUpdate(
@@ -348,6 +410,49 @@ const _sendDiscountNotification = async (product) => {
   }
 };
 
+const generateProductDescription = async (req, res) => {
+  try {
+    const {
+      name,
+      category,
+      subcategory,
+      availableSizes,
+      colorVariants,
+      discountPercent,
+    } = req.body;
+
+    if (!name || !category) {
+      return res.status(400).json({ message: 'Nombre y categoría son requeridos para generar la descripción' });
+    }
+
+    const categoryConfig = await CategoryConfig.findById(category);
+    if (!categoryConfig) {
+      return res.status(400).json({ message: 'Categoría no encontrada' });
+    }
+
+    let subcategoryName = '';
+    if (subcategory) {
+      const subcategoryConfig = await CategoryConfig.findById(subcategory);
+      if (subcategoryConfig) {
+        subcategoryName = subcategoryConfig.name;
+      }
+    }
+
+    const description = await generateDescriptionWithAI({
+      name,
+      categoryName: categoryConfig.name,
+      subcategoryName,
+      availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
+      colorVariants: Array.isArray(colorVariants) ? normalizeColorVariants(colorVariants) : [],
+      discountPercent,
+    });
+
+    res.json({ description });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const getSimilarProducts = async (req, res) => {
   try {
     const { limit = 4 } = req.query;
@@ -390,4 +495,4 @@ const getSimilarProducts = async (req, res) => {
   }
 };
 
-module.exports = { getProducts, getProduct, createProduct, updateProduct, deleteProduct, getSimilarProducts };
+module.exports = { getProducts, getProduct, createProduct, updateProduct, deleteProduct, getSimilarProducts, generateProductDescription };
