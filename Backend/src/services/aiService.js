@@ -1,7 +1,7 @@
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
 const GOOGLE_MODEL =
-  process.env.GOOGLE_MODEL || 'gemini-2.0-flash';
+  process.env.GOOGLE_MODEL || 'gemini-2.5-flash';
 
 const generateProductDescription = async ({
   name,
