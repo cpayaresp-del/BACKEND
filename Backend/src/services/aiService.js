@@ -44,18 +44,13 @@ Entrega un solo párrafo de texto fluido, sin listas ni viñetas, y no comiences
   };
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta2/text:generate?key=${GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta2/models/${GOOGLE_MODEL}:generateText?key=${GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: GOOGLE_MODEL,
-        prompt: requestBody.prompt,
-        temperature: requestBody.temperature,
-        maxOutputTokens: requestBody.maxOutputTokens,
-      }),
+      body: JSON.stringify(requestBody),
     }
   );
 
