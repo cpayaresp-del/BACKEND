@@ -6,6 +6,7 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  generateProductDescription,
 } = require('../controllers/productController');
 
 const { protect } = require('../middlewares/authMiddleware');
@@ -16,6 +17,7 @@ const router = express.Router();
 router.get('/', getProducts);
 router.get('/:id/similar', getSimilarProducts);
 router.get('/:id', getProduct);
+router.post('/generate-description', protect, authorize('admin'), generateProductDescription);
 
 router.post('/', protect, authorize('admin'), createProduct);
 router.put('/:id', protect, authorize('admin'), updateProduct);
