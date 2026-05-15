@@ -20,15 +20,20 @@ const normalizeColorVariants = (colorVariants) => {
       if (!variant || typeof variant !== 'object') return null;
       const name = String(variant.name || '').trim();
       if (!name) return null;
-      const price = variant.price != null && variant.price !== ''
+      const rawPrice = variant.price != null && variant.price !== ''
         ? Number(variant.price)
         : null;
+      const price = Number.isFinite(rawPrice) ? rawPrice : null;
+      const rawStock = variant.stock != null && variant.stock !== ''
+        ? Number(variant.stock)
+        : null;
+      const stock = Number.isFinite(rawStock) ? rawStock : null;
       const images = Array.isArray(variant.images)
         ? variant.images
             .filter((img) => typeof img === 'string' && img.trim().length > 0)
             .map((img) => img.trim())
         : [];
-      return { name, price, images };
+      return { name, price, stock, images };
     })
     .filter((variant) => variant !== null);
 };
