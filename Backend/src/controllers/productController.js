@@ -14,7 +14,7 @@ const getRootCategory = async (categoryId) => {
   return category ? category._id : categoryId;
 };
 
-const normalizeColorVariants = (colorVariants) => {
+const normalizeColorVariants = (colorVariants, defaultSizes = []) => {
   if (!Array.isArray(colorVariants)) return [];
   return colorVariants
     .map((variant) => {
@@ -38,7 +38,7 @@ const normalizeColorVariants = (colorVariants) => {
         ? variant.availableSizes
             .filter((size) => typeof size === 'string' && size.trim().length > 0)
             .map((size) => size.trim())
-        : [];
+        : [...defaultSizes];
       return { name, price, stock, images, availableSizes };
     })
     .filter((variant) => variant !== null);
@@ -103,8 +103,19 @@ const resolveCategoryFilterIds = async (rawValues) => {
 
 const formatProductForResponse = (product) => {
   const obj = product.toObject();
+  const availableSizes = Array.isArray(obj.availableSizes) ? obj.availableSizes : [];
+  const mappedVariants = Array.isArray(obj.colorVariants)
+    ? obj.colorVariants.map((variant) => ({
+        ...variant,
+        availableSizes: Array.isArray(variant?.availableSizes)
+          ? variant.availableSizes
+          : availableSizes,
+      }))
+    : [];
+
   return {
     ...obj,
+    colorVariants: mappedVariants,
     category: obj.categoryName || (product.category?.name ?? ''),
     categoryId:
       typeof obj.category === 'string'
@@ -275,8 +286,8 @@ const createProduct = async (req, res) => {
       console.log(`Descuento vigente hasta: ${endDate}`);
     }
 
-    const normalizedVariants = normalizeColorVariants(colorVariants);
     const sizes = Array.isArray(availableSizes) ? availableSizes : [];
+    const normalizedVariants = normalizeColorVariants(colorVariants, sizes);
 
     if (!productData.description || !productData.description.trim()) {
       productData.description = await generateDescriptionWithAI({
@@ -345,10 +356,12 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    const normalizedVariants = colorVariants !== undefined ? normalizeColorVariants(colorVariants) : previousProduct.colorVariants;
     const sizes = availableSizes !== undefined
       ? (Array.isArray(availableSizes) ? availableSizes : previousProduct.availableSizes)
       : previousProduct.availableSizes;
+    const normalizedVariants = colorVariants !== undefined
+      ? normalizeColorVariants(colorVariants, sizes)
+      : previousProduct.colorVariants;
 
     const updatePayload = {
       ...updateData,
